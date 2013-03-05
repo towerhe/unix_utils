@@ -243,8 +243,15 @@ module UnixUtils
     bin = bin.to_s
     return @@available_query[bin] if defined?(@@available_query) and @@available_query.is_a?(Hash) and @@available_query.has_key?(bin)
     @@available_query ||= {}
-    `which #{bin}`
+    windows? ? `which.exe #{bin}.exe` : `which #{bin}`
     @@available_query[bin] = $?.success?
+  end
+
+  def self.windows?
+    @@windows ||= begin
+      require 'rbconfig'
+      RbConfig::CONFIG['host_os'] =~ /mswin/
+    end
   end
 
   def self.tmp_path(ancestor, extname = nil) # :nodoc:
@@ -292,6 +299,9 @@ module UnixUtils
   end
 
   def self._spawn(argv, input, output, error)
+    argv[0] = argv[0] << ".exe" if windows?
+
+    #puts argv, input, output, error
     # lifted from posix-spawn
     # https://github.com/rtomayko/posix-spawn/blob/master/lib/posix/spawn/child.rb
     Open3.popen3(*argv) do |stdin, stdout, stderr|
@@ -329,7 +339,7 @@ module UnixUtils
             fd.close
           else
             begin
-              buf << fd.readpartial(BUFSIZE)
+              buf << RUBY_PLATFORM == 'java' ? fd.gets(BUFSIZE) : fd.readpartial(BUFSIZE)
             rescue Errno::EAGAIN, Errno::EINTR
             end
           end
